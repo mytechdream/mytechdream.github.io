@@ -1,0 +1,27 @@
+{{- /* Make nested entries in the PaperMod table of contents collapsible. */ -}}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".toc nav ul ul").forEach(function (nestedList) {
+      const parentItem = nestedList.parentElement;
+      if (!parentItem || parentItem.querySelector(":scope > details.toc-subtree")) {
+        return;
+      }
+
+      const parentLink = Array.from(parentItem.children).find(function (child) {
+        return child.tagName === "A";
+      });
+      if (!parentLink) {
+        return;
+      }
+
+      const subtree = document.createElement("details");
+      subtree.className = "toc-subtree";
+      subtree.open = true;
+
+      const summary = document.createElement("summary");
+      summary.appendChild(parentLink.cloneNode(true));
+      subtree.append(summary, nestedList);
+      parentLink.replaceWith(subtree);
+    });
+  });
+</script>
