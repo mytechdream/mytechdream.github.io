@@ -1,6 +1,6 @@
 ---
 title: "利用 Screen 保持 VSCode 连接远程任务持续运行"
-date: 2026-09-28T20:00:00+08:00
+date: 2026-09-27T20:00:00+08:00
 draft: false
 tags: [Linux, screen]
 categories: [命令行]
