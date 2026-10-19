@@ -116,7 +116,6 @@
 
 .toc #TableOfContents a[aria-current="location"] {
     color: var(--toc-accent);
-    font-weight: 500;
 }
 
 .toc #TableOfContents a[aria-current="location"]::before {

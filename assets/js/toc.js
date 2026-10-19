@@ -56,6 +56,9 @@
   if (!entries.length) return;
 
   let activeLink;
+  let navigationTarget;
+  let navigationTimer;
+  let scheduled = 0;
   const setActive = (link) => {
     let hiddenBranch = link.closest("ul[hidden]");
     while (hiddenBranch) {
@@ -68,6 +71,34 @@
     activeLink = link;
   };
 
+  const releaseNavigation = () => {
+    clearTimeout(navigationTimer);
+    navigationTarget = undefined;
+  };
+  const waitForScrollIdle = () => {
+    clearTimeout(navigationTimer);
+    navigationTimer = setTimeout(() => {
+      const entry = entries.find(({ link }) => link === navigationTarget);
+      if (!entry) return;
+      const destination = Math.max(0, Math.min(
+        window.scrollY + entry.heading.getBoundingClientRect().top,
+        document.documentElement.scrollHeight - window.innerHeight,
+      ));
+      // A busy/background tab may pause mid-animation. Only unlock once the
+      // heading has actually arrived (including destinations near page bottom).
+      if (Math.abs(window.scrollY - destination) <= 2) releaseNavigation();
+    }, 180);
+  };
+  const selectTarget = (link) => {
+    // PaperMod starts a smooth scroll on the anchor itself. Keep its destination
+    // selected instead of letting intermediate scroll events overwrite it.
+    cancelAnimationFrame(scheduled);
+    scheduled = 0;
+    navigationTarget = link;
+    setActive(link);
+    waitForScrollIdle();
+  };
+
   const revealHash = () => {
     const entry = entries.find(({ link }) => link.hash === window.location.hash);
     if (!entry) return;
@@ -77,12 +108,15 @@
       branches.get(branch.id)?.(true);
       branch = branch.parentElement.closest("ul");
     }
-    setActive(entry.link);
+    selectTarget(entry.link);
   };
 
-  let scheduled = false;
   const updateCurrent = () => {
-    scheduled = false;
+    scheduled = 0;
+    if (navigationTarget) {
+      setActive(navigationTarget);
+      return;
+    }
     const offset = Math.min(160, window.innerHeight * 0.2);
     let current = entries[0];
     for (const entry of entries) {
@@ -95,16 +129,38 @@
     setActive(current.link);
   };
   const scheduleUpdate = () => {
+    if (navigationTarget) {
+      setActive(navigationTarget);
+      return;
+    }
     if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(updateCurrent);
+    scheduled = requestAnimationFrame(updateCurrent);
+  };
+  const cancelNavigation = () => {
+    if (!navigationTarget) return;
+    releaseNavigation();
+    scheduleUpdate();
   };
 
   navigation.addEventListener("click", (event) => {
     const link = event.target.closest('a[href^="#"]');
-    if (link) setActive(link);
+    if (link) selectTarget(link);
   });
-  window.addEventListener("scroll", scheduleUpdate, { passive: true });
+  window.addEventListener("scroll", () => {
+    if (navigationTarget) waitForScrollIdle();
+    scheduleUpdate();
+  }, { passive: true });
+  window.addEventListener("wheel", cancelNavigation, { passive: true });
+  window.addEventListener("touchstart", cancelNavigation, { passive: true });
+  window.addEventListener("pointerdown", (event) => {
+    if (!toc.contains(event.target)) cancelNavigation();
+  }, { passive: true });
+  window.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.target.closest("input, textarea, select, [contenteditable]")) return;
+    if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) {
+      cancelNavigation();
+    }
+  });
   window.addEventListener("resize", scheduleUpdate);
   window.addEventListener("hashchange", revealHash);
   window.addEventListener("load", scheduleUpdate, { once: true });
